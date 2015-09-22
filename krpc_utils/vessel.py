@@ -184,20 +184,34 @@ class Vessel(object):
             #if alt + (dist / 2.0) < apo and alt + dist > apo:
         return throttle_f
 
+    def thrust_on_apo_func(self, seconds_behind=8, autostage=True):
+        def throttle_f(vessel):
+            if autostage:
+                vessel.check_autostage()
+            apo_time = vessel.apo_time()
+            if apo_time > seconds_behind:
+                vessel.throttle(0)
+            else:
+                vessel.throttle(1)
+        return throttle_f
+
     def launch(self, 
             alt_max=30000, apo_max=75000, turn_max=90, init_speed_max=100.
             termv_accel=1.02, termv_decel=0.99, termv_min_throttle=0.1,
             follow_apo_min_dist=1000, follow_apo_max_dist=12000,
-            follow_apo_dist=None, autostage=True):
+            follow_apo_dist=None, circularize_seconds=8,
+            autostage=True):
         self.throttle(1)
         self.spacebar()
 
+        print('Full throttle until 100 m/s')
         # Burn until you hit 100 m/s
         self.run_behavior(
             turn_f=self.static_angle_func(0),
             vspeed=self.vspeed,
             vspeed_max=init_speed_max)
 
+        print('Gravity turn with terminal velocity maintenance')
         # start to tip gradually up to alt_max and turn_max
         turn_f = self.gradual_turn_func(
             alt_max=alt_max, turn_max=turn_max)
@@ -207,6 +221,7 @@ class Vessel(object):
         self.run_behavior(turn_f=turn_f, throttle_f=throttle_f,
             alt=self.alt, alt_max=alt_max)
 
+        print('Follow apoapsis')
         # Now we're at `alt_max` and `turn_max` degrees AoA
         turn_f = self.static_angle_func(90)
         throttle_f = self.follow_apoapsis_func(
@@ -217,18 +232,13 @@ class Vessel(object):
             turn_f=turn_f, throttle_f=throttle_f, apo=self.apo,
             apo_max=apo_max)
 
+        print('Circularize')
         # Now circularize, because we're `follow_apo_dist` away from the 
         # apoapsis
-        def throttle_f():
-            if stream['liquid'][stage]() < 0.01:
-                spacebar()
-            apo_time = stream['apo_time']()
-            if apo_time > 8:
-                throttle(0)
-            else:
-                throttle(1)
-        apo = stream['apo']()
-        self.run_behavior(turn_f=static_angle(90), throttle_f=throttle_f,
-            peri=stream['peri'], peri_max=apo)
+        throttle_f = self.thrust_on_apo_func(seconds=circularize_seconds,
+            autostage=autostage)
+        turn_f = self.static_angle_func(90)
+        self.run_behavior(turn_f=turn_f, throttle_f=throttle_f,
+            peri=self.peri, peri_max=self.apo())
         throttle(0)
         print('Orbiting!')

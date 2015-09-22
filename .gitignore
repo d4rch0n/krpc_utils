@@ -1,0 +1,6 @@
+syntax: glob
+*.pyc
+*.log
+build/*
+krpc_utils.egg-info/*
+dist/*

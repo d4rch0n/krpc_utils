@@ -62,12 +62,12 @@ class Vessel(object):
             'ecc': self.conn.add_stream(
                 getattr, self.vessel.orbit, 'eccentricity'),
             'liquid': [
-                self.conn.add_stream(stages[i].amount, 'LiquidFuel')
-                for i in range(0, craft_cfg.num_stages)
+                self.conn.add_stream(self.stages[i].amount, 'LiquidFuel')
+                for i in range(0, self.num_stages)
             ][::-1],
             'solid': [
-                self.conn.add_stream(stages[i].amount, 'SolidFuel')
-                for i in range(0, craft_cfg.num_stages)
+                self.conn.add_stream(self.stages[i].amount, 'SolidFuel')
+                for i in range(0, self.num_stages)
             ][::-1],
         }
         self.vessel.auto_pilot.engage()
@@ -196,7 +196,7 @@ class Vessel(object):
         return throttle_f
 
     def launch(self, 
-            alt_max=30000, apo_max=75000, turn_max=90, init_speed_max=100.
+            alt_max=30000, apo_max=75000, turn_max=90, init_speed_max=100,
             termv_accel=1.02, termv_decel=0.99, termv_min_throttle=0.1,
             follow_apo_min_dist=1000, follow_apo_max_dist=12000,
             follow_apo_dist=None, circularize_seconds=8,
@@ -235,10 +235,10 @@ class Vessel(object):
         print('Circularize')
         # Now circularize, because we're `follow_apo_dist` away from the 
         # apoapsis
-        throttle_f = self.thrust_on_apo_func(seconds=circularize_seconds,
-            autostage=autostage)
+        throttle_f = self.thrust_on_apo_func(
+            seconds_behind=circularize_seconds, autostage=autostage)
         turn_f = self.static_angle_func(90)
         self.run_behavior(turn_f=turn_f, throttle_f=throttle_f,
             peri=self.peri, peri_max=self.apo())
-        throttle(0)
+        self.throttle(0)
         print('Orbiting!')

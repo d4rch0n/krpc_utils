@@ -11,13 +11,14 @@ import os
 import sys
 import time
 import krpc
+from math import atan, pi
 
 class Vessel(object):
 
     def __init__(self, conn=None, vessel=None, num_stages=1):
         self.conn = conn
         self.last_turn_offset = 0
-        self.stage = 0
+        self.stage = -1
         self.num_stages = num_stages
         if vessel:
             self.vessel = vessel

@@ -74,6 +74,10 @@ class Vessel(object):
         self.vessel.auto_pilot.engage()
         self.vessel.auto_pilot.target_pitch_and_heading(90, 90)
         self.vessel.auto_pilot.sas = True
+        print('Resources:')
+        for i in range(len(self.stages)):
+            print('Liquid[{}]: {}'.format(i, self.stage_liquid()))
+            print('Solid[{}]: {}'.format(i, self.stage_solid()))
 
     def __getattr__(self, attr):
         if attr in self.stream:
@@ -92,6 +96,9 @@ class Vessel(object):
         if t is None:
             return self.vessel.control.throttle
         self.vessel.control.throttle = min(max(t, 0.0), 1.0)
+
+    def direction(self):
+        return self.vessel.direction(self.rframe)
 
     def turn(self, turn_offset):
         if abs(turn_offset - self.last_turn_offset) > 0.5:
@@ -137,16 +144,24 @@ class Vessel(object):
             vessel.turn(val)
         return angle0
 
+    def prograde_angle(self):
+        return 90 - (atan(float(self.vspeed()) / self.hspeed()) / pi * 180)
+
     def gradual_turn_func(self, alt_max=30000, turn_max=90):
         init_alt = self.alt()
         alt_diff = float(alt_max - init_alt)
+        init_pa = self.prograde_angle()
+
         def turn_f(vessel):
+            x, y, z = vessel.direction()
+            print('{}, {}, {}'.format(x, y, z))
             ratio = (vessel.alt() - init_alt) / alt_diff
-            vessel.turn(turn_max * ratio)
+            desired_pa = turn_max * ratio
+            vessel.turn(desired_pa)
         return turn_f
 
     def termv_thrust_func(self,
-            accel=1.02, decel=0.99, min_throttle=0.1, autostage=True):
+            accel=1.005, decel=0.999, min_throttle=0.0, autostage=True):
         def throttle_f(vessel):
             # keep throttle below terminal velocity
             if autostage:
@@ -197,10 +212,10 @@ class Vessel(object):
         return throttle_f
 
     def launch(self, 
-            alt_max=30000, apo_max=75000, turn_max=90, init_speed_max=100,
-            termv_accel=1.02, termv_decel=0.99, termv_min_throttle=0.1,
-            follow_apo_min_dist=1000, follow_apo_max_dist=12000,
-            follow_apo_dist=None, circularize_seconds=8,
+            alt_max=40000, apo_max=75000, turn_max=90, init_speed_max=120,
+            termv_accel=1.01, termv_decel=0.99, termv_min_throttle=0.0,
+            follow_apo_min_dist=500, follow_apo_max_dist=12000,
+            follow_apo_dist=None, circularize_seconds=4,
             autostage=True):
         self.throttle(1)
         self.spacebar()

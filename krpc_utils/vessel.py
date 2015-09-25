@@ -39,6 +39,7 @@ class Vessel(object):
             for x in range(0, self.num_stages)
         ]
         self.rframe = self.vessel.orbit.body.reference_frame
+        self.srframe = self.vessel.surface_reference_frame
         self.stream = {
             'ut': self.conn.add_stream(
                 getattr, self.conn.space_center, 'ut'),
@@ -52,6 +53,14 @@ class Vessel(object):
                 getattr, self.vessel.flight(self.rframe), 'horizontal_speed'),
             'termv': self.conn.add_stream(
                 getattr, self.vessel.flight(self.rframe), 'terminal_velocity'),
+            'prograde': self.conn.add_stream(
+                getattr, self.vessel.flight(self.srframe), 'prograde'),
+            'orbit_prograde': self.conn.add_stream(
+                getattr, self.vessel.flight(self.rframe), 'prograde'),
+            'heading': self.conn.add_stream(
+                getattr, self.vessel.flight(self.srframe), 'heading'),
+            'pitch': self.conn.add_stream(
+                getattr, self.vessel.flight(self.srframe), 'pitch'),
             'apo': self.conn.add_stream(
                 getattr, self.vessel.orbit, 'apoapsis_altitude'),
             'apo_time': self.conn.add_stream(
@@ -78,6 +87,9 @@ class Vessel(object):
         for i in range(len(self.stages)):
             print('Liquid[{}]: {}'.format(i, self.stage_liquid()))
             print('Solid[{}]: {}'.format(i, self.stage_solid()))
+        print('Prograde : {}'.format(self.prograde()))
+        print('Heading  : {}'.format(self.heading()))
+        print('Pitch    : {}'.format(self.pitch()))
 
     def __getattr__(self, attr):
         if attr in self.stream:
@@ -97,10 +109,13 @@ class Vessel(object):
             return self.vessel.control.throttle
         self.vessel.control.throttle = min(max(t, 0.0), 1.0)
 
-    def direction(self):
-        return self.vessel.direction(self.rframe)
+    def surface_direction(self):
+        return self.vessel.direction(self.srframe)
 
-    def turn(self, turn_offset):
+    def rframe_velocity(self):
+        return self.vessel.velocity(self.rframe)
+
+    def turn_east(self, turn_offset):
         if abs(turn_offset - self.last_turn_offset) > 0.5:
             self.last_turn_offset = turn_offset
             self.vessel.auto_pilot.target_pitch_and_heading(
@@ -138,26 +153,78 @@ class Vessel(object):
         self.stage += 1
         self.vessel.control.activate_next_stage()
 
+    def debug_print(self):
+        #for v in ('speed', 'hspeed', 'vspeed', 'alt', 'termv'):
+        #    val = getattr(self, v)()
+        #    print('{:10s}: {}'.format(v, val))
+        #velo = self.rframe_velocity()
+        #print('{}, {}, {}'.format(*velo))
+        pa = vessel.prograde_east_angle()
+        poa = vessel.orbit_prograde_east_angle()
+        print('surface: {}'.format(pa))
+        print('orbit:   {}'.format(poa))
+
     @classmethod
     def static_angle_func(cls, val):
         def angle0(vessel):
-            vessel.turn(val)
+            vessel.debug_print()
+            vessel.turn_east(val)
         return angle0
 
-    def prograde_angle(self):
-        return 90 - (atan(float(self.vspeed()) / self.hspeed()) / pi * 180)
+    @classmethod
+    def static_prograde_func(cls, val, delta=0.5):
+        def angle0(vessel):
+            pa = vessel.orbit_prograde_east_angle()
+            a = vessel.vessel_east_angle()
+            if val > pa:
+                trn = a + delta
+            else:
+                trn = a - delta
+            vessel.turn_east(trn)
+        return angle0
+
+    def prograde_east_angle(self):
+        _, _, d = self.prograde()
+        return d * 90
+
+    def orbit_prograde_east_angle(self):
+        _, _, d = self.orbit_prograde()
+        return 90 - (d * -90)
+
+    def vessel_east_angle(self):
+        #_, _, d = self.surface_direction()
+        ## 1 for East, 0 for Up, -1 for West
+        #return d * 90
+        return 90 - self.pitch()
 
     def gradual_turn_func(self, alt_max=30000, turn_max=90):
         init_alt = self.alt()
         alt_diff = float(alt_max - init_alt)
-        init_pa = self.prograde_angle()
-
         def turn_f(vessel):
-            x, y, z = vessel.direction()
-            print('{}, {}, {}'.format(x, y, z))
+            ratio = (vessel.alt() - init_alt) / alt_diff
+            desired_a = turn_max * ratio
+            vessel.turn_east(desired_a)
+        return turn_f
+
+    def gradual_turn_prograde_func(self, alt_max=30000, turn_max=90, 
+           delta=5.0):
+        init_alt = self.alt()
+        alt_diff = float(alt_max - init_alt)
+        def turn_f(vessel):
+            pa = vessel.prograde_east_angle()
+            a = vessel.vessel_east_angle()
             ratio = (vessel.alt() - init_alt) / alt_diff
             desired_pa = turn_max * ratio
-            vessel.turn(desired_pa)
+            diff = desired_pa - pa
+            if diff > 1:
+                trn = a + delta
+            elif diff < -1:
+                trn = a - delta
+            else:
+                trn = a
+            trn = min(90, max(trn, 0))
+            vessel.debug_print()
+            vessel.turn_east(trn)
         return turn_f
 
     def termv_thrust_func(self,
@@ -223,13 +290,13 @@ class Vessel(object):
         print('Full throttle until 100 m/s')
         # Burn until you hit 100 m/s
         self.run_behavior(
-            turn_f=self.static_angle_func(0),
+            turn_f=self.static_angle_func(1),
             vspeed=self.vspeed,
             vspeed_max=init_speed_max)
 
         print('Gravity turn with terminal velocity maintenance')
         # start to tip gradually up to alt_max and turn_max
-        turn_f = self.gradual_turn_func(
+        turn_f = self.gradual_turn_prograde_func(
             alt_max=alt_max, turn_max=turn_max)
         throttle_f = self.termv_thrust_func(
             accel=termv_accel, decel=termv_decel,
@@ -239,7 +306,7 @@ class Vessel(object):
 
         print('Follow apoapsis')
         # Now we're at `alt_max` and `turn_max` degrees AoA
-        turn_f = self.static_angle_func(90)
+        turn_f = self.static_prograde_func(90)
         throttle_f = self.follow_apoapsis_func(
             max_dist=follow_apo_max_dist, min_dist=follow_apo_min_dist,
             static_dist=follow_apo_dist, apo_target = apo_max,

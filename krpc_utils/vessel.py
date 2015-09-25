@@ -203,7 +203,7 @@ class Vessel(object):
     @classmethod
     def static_angle_func(cls, val):
         def angle0(vessel):
-            vessel.debug_print()
+            #vessel.debug_print()
             vessel.turn_east(val)
         return angle0
 
@@ -264,7 +264,7 @@ class Vessel(object):
             else:
                 trn = a
             trn = min(90, max(trn, 0))
-            vessel.debug_print()
+            #vessel.debug_print()
             vessel.turn_east(trn)
         return turn_f
 

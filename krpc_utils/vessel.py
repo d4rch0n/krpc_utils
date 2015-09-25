@@ -47,15 +47,15 @@ class Vessel(object):
             'ut': self.conn.add_stream(
                 getattr, self.conn.space_center, 'ut'),
             'alt': self.conn.add_stream(
-                getattr, self.vessel.flight(self.o_frame), 'surface_altitude'),
+                getattr, self.vessel.flight(self.ob_frame), 'surface_altitude'),
             'speed': self.conn.add_stream(
-                getattr, self.vessel.flight(self.o_frame), 'speed'),
+                getattr, self.vessel.flight(self.ob_frame), 'speed'),
             'vspeed': self.conn.add_stream(
-                getattr, self.vessel.flight(self.o_frame), 'vertical_speed'),
+                getattr, self.vessel.flight(self.ob_frame), 'vertical_speed'),
             'hspeed': self.conn.add_stream(
-                getattr, self.vessel.flight(self.o_frame), 'horizontal_speed'),
+                getattr, self.vessel.flight(self.ob_frame), 'horizontal_speed'),
             'termv': self.conn.add_stream(
-                getattr, self.vessel.flight(self.o_frame), 'terminal_velocity'),
+                getattr, self.vessel.flight(self.ob_frame), 'terminal_velocity'),
             'heading': self.conn.add_stream(
                 getattr, self.vessel.flight(self.s_frame), 'heading'),
             'pitch': self.conn.add_stream(

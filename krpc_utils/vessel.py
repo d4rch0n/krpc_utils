@@ -320,8 +320,8 @@ class Vessel(object):
         return throttle_f
 
     def launch(self, 
-            alt_max=40000, apo_max=75000, turn_max=90, init_speed_max=120,
-            termv_accel=1.01, termv_decel=0.99, termv_min_throttle=0.0,
+            alt_max=25000, apo_max=75000, turn_max=90, init_speed_max=100,
+            termv_accel=1.01, termv_decel=0.995, termv_min_throttle=0.0,
             follow_apo_min_dist=500, follow_apo_max_dist=12000,
             follow_apo_dist=None, circularize_seconds=4,
             autostage=True):

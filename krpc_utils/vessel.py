@@ -110,6 +110,9 @@ class Vessel(object):
             return self.vessel.control.throttle
         self.vessel.control.throttle = min(max(t, 0.0), 1.0)
 
+    def direction(self):
+        return self.vessel.direction(self.frame)
+
     def s_direction(self):
         return self.vessel.direction(self.s_frame)
 
@@ -122,17 +125,23 @@ class Vessel(object):
     def sv_direction(self):
         return self.vessel.direction(self.sv_frame)
 
-    def s_frame_velocity(self):
+    def velocity(self):
+        return self.vessel.velocity(self.frame)
+
+    def s_velocity(self):
         return self.vessel.velocity(self.s_frame)
 
-    def o_frame_velocity(self):
+    def o_velocity(self):
         return self.vessel.velocity(self.o_frame)
 
-    def ob_frame_velocity(self):
+    def ob_velocity(self):
         return self.vessel.velocity(self.ob_frame)
 
-    def sv_frame_velocity(self):
+    def sv_velocity(self):
         return self.vessel.velocity(self.sv_frame)
+
+    def prograde(self):
+        return self.vessel.flight(self.frame).prograde
 
     def s_prograde(self):
         return self.vessel.flight(self.s_frame).prograde
@@ -185,10 +194,11 @@ class Vessel(object):
         self.vessel.control.activate_next_stage()
 
     def debug_print(self):
+        #print('prograde:              ({:.3f}, {:.3f}, {:.3f})'.format(*self.prograde()))
         print('surface prograde:      ({:.3f}, {:.3f}, {:.3f})'.format(*self.s_prograde()))
-        print('surface velo prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.sv_prograde()))
-        print('orbital prograde:      ({:.3f}, {:.3f}, {:.3f})'.format(*self.o_prograde()))
-        print('orbital body prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.ob_prograde()))
+        #print('surface velo prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.sv_prograde()))
+        #print('orbital prograde:      ({:.3f}, {:.3f}, {:.3f})'.format(*self.o_prograde()))
+        #print('orbital body prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.ob_prograde()))
 
     @classmethod
     def static_angle_func(cls, val):
@@ -200,8 +210,8 @@ class Vessel(object):
     @classmethod
     def static_orbit_prograde_func(cls, val, delta=0.5):
         def angle0(vessel):
-            pa = vessel.orbit_prograde_east_angle()
-            a = vessel.vessel_east_angle()
+            pa = vessel.orbit_prograde_navball()
+            a = vessel.angle_east_navball()
             if val > pa:
                 trn = a + delta
             else:
@@ -215,15 +225,14 @@ class Vessel(object):
         _, _, d = self.s_prograde()
         return (d * 90) + 90
 
-    def orbit_prograde_east_angle(self):
-        # Third of the vector, going from -1 to 0
-        # -1 -> 0  (0 -> 90)
-        _, _, d = self.o_prograde()
-        # mult 90: -90 -> 0 (0 -> 90)
-        # add 90 :  0  -> 90
-        return (d * 90) + 90
+    def orbit_prograde_navball(self):
+        # On a surface reference point, x is up and z is east.
+        x, _, z = self.s_prograde()
+        rad = atan(x / z)
+        east_to_up = rad / pi * 180
+        return 90 - east_to_up
 
-    def vessel_east_angle(self):
+    def angle_east_navball(self):
         #_, _, d = self.s_direction()
         ## 1 for East, 0 for Up, -1 for West
         #return d * 90
@@ -243,8 +252,8 @@ class Vessel(object):
         init_alt = self.alt()
         alt_diff = float(alt_max - init_alt)
         def turn_f(vessel):
-            pa = vessel.surface_prograde_east_angle()
-            a = vessel.vessel_east_angle()
+            pa = vessel.orbit_prograde_navball()
+            a = vessel.angle_east_navball()
             ratio = (vessel.alt() - init_alt) / alt_diff
             desired_pa = turn_max * ratio
             diff = desired_pa - pa

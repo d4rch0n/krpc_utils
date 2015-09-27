@@ -14,7 +14,7 @@ import krpc
 from math import atan, pi
 
 class Vessel(object):
-    TERMV_MULT = 3.0
+    TERMV_MULT = 2.0
 
     def __init__(self, conn=None, vessel=None, num_stages=1):
         self.conn = conn

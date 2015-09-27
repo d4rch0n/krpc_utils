@@ -14,6 +14,7 @@ import krpc
 from math import atan, pi
 
 class Vessel(object):
+    TERMV_MULT = 3.0
 
     def __init__(self, conn=None, vessel=None, num_stages=1):
         self.conn = conn
@@ -308,7 +309,7 @@ class Vessel(object):
             # keep throttle below terminal velocity
             if autostage:
                 vessel.check_autostage()
-            if vessel.speed() < vessel.termv():
+            if vessel.speed() < vessel.termv() * self.TERMV_MULT:
                 vessel.throttle(vessel.throttle() * accel)
             else:
                 vessel.throttle(max(vessel.throttle() * decel, min_throttle))

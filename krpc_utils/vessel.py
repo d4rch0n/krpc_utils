@@ -91,6 +91,13 @@ class Vessel(object):
         print('Surface Velocity Prograde : {}'.format(self.sv_prograde()))
         print('Heading  : {}'.format(self.heading()))
         print('Pitch    : {}'.format(self.pitch()))
+        #self.draw_dir('prograde', self.sv_frame, (1, 0, 0))
+        #self.draw_dir('direction', self.sv_frame, (0, 1, 0))
+        #self.draw_dir('direction', self.sv_frame, (0, 0, 1))
+
+    def draw_dir(self, funcname, rframe, vec):
+        func = getattr(self.vessel.flight(rframe), funcname)
+        self.conn.space_center.draw_direction(func, rframe, vec)
 
     def __getattr__(self, attr):
         if attr in self.stream:
@@ -195,7 +202,7 @@ class Vessel(object):
 
     def debug_print(self):
         #print('prograde:              ({:.3f}, {:.3f}, {:.3f})'.format(*self.prograde()))
-        print('surface prograde:      ({:.3f}, {:.3f}, {:.3f})'.format(*self.s_prograde()))
+        print('SPN: {:.1f}'.format(self.surface_prograde_navball()))
         #print('surface velo prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.sv_prograde()))
         #print('orbital prograde:      ({:.3f}, {:.3f}, {:.3f})'.format(*self.o_prograde()))
         #print('orbital body prograde: ({:.3f}, {:.3f}, {:.3f})'.format(*self.ob_prograde()))
@@ -219,15 +226,41 @@ class Vessel(object):
             vessel.turn_east(trn)
         return angle0
 
+    @classmethod
+    def static_surface_prograde_func(cls, val, delta=0.5):
+        def angle0(vessel):
+            pa = vessel.surface_prograde_navball()
+            a = vessel.angle_east_navball()
+            if val > pa:
+                trn = a + delta
+            else:
+                trn = a - delta
+            vessel.turn_east(trn)
+        return angle0
 
-    def surface_prograde_east_angle(self):
+
+    def surface_prograde_navball(self):
         # XXX must be off
-        _, _, d = self.s_prograde()
-        return (d * 90) + 90
+        #x, y, z = self.sv_prograde()
+        #if z == 0:
+        #    return 0.0
+        #rad = atan(x / z)
+        #east_to_up = rad / pi * 180
+        return 90 - (self.pitch() - self.angle_of_attack())
+
+    def angle_of_attack(self):
+        x, y, z = self.sv_direction()
+        if y == 0:
+            return 0.0
+        rad = atan(x / y)
+        east_to_up = rad / pi * 180
+        return east_to_up
 
     def orbit_prograde_navball(self):
         # On a surface reference point, x is up and z is east.
         x, _, z = self.s_prograde()
+        if z == 0:
+            return 0
         rad = atan(x / z)
         east_to_up = rad / pi * 180
         return 90 - east_to_up
@@ -252,7 +285,8 @@ class Vessel(object):
         init_alt = self.alt()
         alt_diff = float(alt_max - init_alt)
         def turn_f(vessel):
-            pa = vessel.orbit_prograde_navball()
+            pa = vessel.surface_prograde_navball()
+            #pa = vessel.orbit_prograde_navball()
             a = vessel.angle_east_navball()
             ratio = (vessel.alt() - init_alt) / alt_diff
             desired_pa = turn_max * ratio
@@ -347,7 +381,7 @@ class Vessel(object):
 
         print('Follow apoapsis')
         # Now we're at `alt_max` and `turn_max` degrees AoA
-        turn_f = self.static_orbit_prograde_func(90)
+        turn_f = self.static_surface_prograde_func(90)
         throttle_f = self.follow_apoapsis_func(
             max_dist=follow_apo_max_dist, min_dist=follow_apo_min_dist,
             static_dist=follow_apo_dist, apo_target = apo_max,
